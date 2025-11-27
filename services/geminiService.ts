@@ -1,14 +1,17 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Level2Challenge, SphinxRiddle } from "../types";
 
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+// Helper to safely initialize the AI client
+const getAiClient = () => {
+    try {
+        if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+            return new GoogleGenAI({ apiKey: process.env.API_KEY });
+        }
+    } catch (e) {
+        console.error("Failed to initialize GoogleGenAI:", e);
+    }
+    return null;
+};
 
 export const getNewRecipe = async (previousRecipe?: { green: number; purple: number }): Promise<{ potionName: string; green: number; purple: number }> => {
     const fallbackRecipes = [
@@ -26,6 +29,9 @@ export const getNewRecipe = async (previousRecipe?: { green: number; purple: num
             : fallbackRecipes;
         return availableRecipes[Math.floor(Math.random() * availableRecipes.length)];
     };
+
+    const ai = getAiClient();
+    if (!ai) return getFallback();
 
     try {
         let prompt = `Act as a Potion Master. Generate a new, simple potion recipe. The recipe involves 'Green Slime' and 'Purple Goo'. Keep the ratio numbers for each part between 1 and 9. Ensure the two numbers are different and the ratio is in its simplest form (e.g., use 2:3, not 4:6). Provide a fun, creative name for the potion.`;
@@ -68,6 +74,9 @@ export const getNewRecipe = async (previousRecipe?: { green: number; purple: num
 };
 
 export const getLevel1Hint = async (actualGreen: number, actualPurple: number, expectedGreen: number, expectedPurple: number): Promise<string> => {
+    const ai = getAiClient();
+    if (!ai) return "Something went wrong! Check the recipe card and try again.";
+
     try {
         const prompt = `Act as a Potion Master. The student was supposed to make a ${expectedGreen}:${expectedPurple} (Green:Purple) potion but made a ${actualGreen}:${actualPurple} potion. Generate a 1-sentence hint that explains why the potion failed. Don't give the answer. Be encouraging and speak like a friendly magical creature.`;
         const response = await ai.models.generateContent({
@@ -82,6 +91,22 @@ export const getLevel1Hint = async (actualGreen: number, actualPurple: number, e
 };
 
 export const getNewLevel2Challenge = async (): Promise<Level2Challenge | null> => {
+    const fallback = {
+        potionName: "Giant's Warming Potion",
+        ingredient1Name: "Fire Salts",
+        ingredient2Name: "Frost Dew",
+        baseRatio1: 2,
+        baseRatio2: 5,
+        scaleFactor: 3,
+        givenPart1: 6,
+        scaled_part_2: 15,
+        total_units: 21,
+        hint: "You're making a batch 3 times bigger! So you'll need 3 times as much Frost Dew!"
+    };
+
+    const ai = getAiClient();
+    if (!ai) return fallback;
+
     try {
         const prompt = `You are a ratio logic engine for a potion game. Create a new challenge for scaling a recipe with "Fire Salts" and "Frost Dew".
         Provide a JSON response with:
@@ -126,22 +151,25 @@ export const getNewLevel2Challenge = async (): Promise<Level2Challenge | null> =
         };
     } catch (error) {
         console.error("Error fetching new level 2 challenge:", error);
-        return {
-            potionName: "Giant's Warming Potion",
-            ingredient1Name: "Fire Salts",
-            ingredient2Name: "Frost Dew",
-            baseRatio1: 2,
-            baseRatio2: 5,
-            scaleFactor: 3,
-            givenPart1: 6,
-            scaled_part_2: 15,
-            total_units: 21,
-            hint: "You're making a batch 3 times bigger! So you'll need 3 times as much Frost Dew!"
-        };
+        return fallback;
     }
 };
 
 export const getSphinxRiddle = async (): Promise<SphinxRiddle | null> => {
+    const fallback = {
+        riddleText: "For every 2 Red Gems, you need 3 Blue Gems. I have 4 Red Gems here. How many Blue Gems do I need to match?",
+        ingredient1Name: "Red Gems",
+        ingredient2Name: "Blue Gems",
+        ratio1: 2,
+        ratio2: 3,
+        givenAmount: 4,
+        requiredAmount: 6,
+        explanation: "4 Red Gems is double the amount of 2. So you need double the Blue Gems (3 + 3 = 6)."
+    };
+
+    const ai = getAiClient();
+    if (!ai) return fallback;
+
     try {
         const prompt = `Generate a very simple ratio word problem for a child (ages 7-10).
         
@@ -192,16 +220,6 @@ export const getSphinxRiddle = async (): Promise<SphinxRiddle | null> => {
         return JSON.parse(jsonText);
     } catch (error) {
         console.error("Error fetching sphinx riddle:", error);
-        // Fallback riddle
-        return {
-            riddleText: "For every 2 Red Gems, you need 3 Blue Gems. I have 4 Red Gems here. How many Blue Gems do I need to match?",
-            ingredient1Name: "Red Gems",
-            ingredient2Name: "Blue Gems",
-            ratio1: 2,
-            ratio2: 3,
-            givenAmount: 4,
-            requiredAmount: 6,
-            explanation: "4 Red Gems is double the amount of 2. So you need double the Blue Gems (3 + 3 = 6)."
-        };
+        return fallback;
     }
 };

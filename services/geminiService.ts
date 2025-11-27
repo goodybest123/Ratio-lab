@@ -3,13 +3,15 @@ import { Level2Challenge, SphinxRiddle } from "../types";
 
 // Helper to safely initialize the AI client
 const getAiClient = () => {
+    // Per guidelines, API key must be obtained exclusively from process.env.API_KEY
     try {
         if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
             return new GoogleGenAI({ apiKey: process.env.API_KEY });
         }
     } catch (e) {
-        console.error("Failed to initialize GoogleGenAI:", e);
+        console.error("Error accessing process.env.API_KEY", e);
     }
+    
     return null;
 };
 

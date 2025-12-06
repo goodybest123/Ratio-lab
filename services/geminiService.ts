@@ -5,14 +5,32 @@ import { Level2Challenge, SphinxRiddle } from "../types";
 const getAiClient = () => {
     // Per guidelines, API key must be obtained exclusively from process.env.API_KEY
     try {
+        // Check for process.env (Node/Standard)
         if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
             return new GoogleGenAI({ apiKey: process.env.API_KEY });
+        }
+        // Fallback: check if window.process was polyfilled (e.g. by index.html script for Vercel)
+        if (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) {
+             return new GoogleGenAI({ apiKey: (window as any).process.env.API_KEY });
         }
     } catch (e) {
         console.error("Error accessing process.env.API_KEY", e);
     }
     
+    console.warn("API_KEY not found. Using offline fallback mode.");
     return null;
+};
+
+// Helper to strip Markdown code blocks from JSON response
+const parseJson = (text: string) => {
+    try {
+        // Remove ```json and ``` wrapper if present
+        const cleanText = text.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+        return JSON.parse(cleanText);
+    } catch (e) {
+        console.error("Failed to parse JSON:", text);
+        throw e;
+    }
 };
 
 export const getNewRecipe = async (previousRecipe?: { green: number; purple: number }): Promise<{ potionName: string; green: number; purple: number }> => {
@@ -61,7 +79,7 @@ export const getNewRecipe = async (previousRecipe?: { green: number; purple: num
             },
         });
 
-        const newRecipe = JSON.parse(response.text.trim());
+        const newRecipe = parseJson(response.text.trim());
 
         if (previousRecipe && newRecipe.green === previousRecipe.green && newRecipe.purple === previousRecipe.purple) {
             console.warn("AI returned the same recipe. Using fallback logic.");
@@ -143,8 +161,7 @@ export const getNewLevel2Challenge = async (): Promise<Level2Challenge | null> =
             },
         });
 
-        const jsonText = response.text.trim();
-        const challengeData = JSON.parse(jsonText);
+        const challengeData = parseJson(response.text.trim());
 
         return {
             ...challengeData,
@@ -218,8 +235,7 @@ export const getSphinxRiddle = async (): Promise<SphinxRiddle | null> => {
             },
         });
 
-        const jsonText = response.text.trim();
-        return JSON.parse(jsonText);
+        return parseJson(response.text.trim());
     } catch (error) {
         console.error("Error fetching sphinx riddle:", error);
         return fallback;

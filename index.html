@@ -16,19 +16,32 @@
   }
 }
 </script>
-<script>
-  // Global error handler to catch "Blank Page" issues (like process not defined)
+<script type="module">
+  // Polyfill process.env for Vercel/Vite environments
+  if (typeof process === 'undefined') {
+    window.process = { env: {} };
+  } else if (!window.process) {
+    window.process = process;
+  }
+  
+  // Attempt to bridge VITE_API_KEY to process.env.API_KEY
+  try {
+    if (import.meta && import.meta.env) {
+      if (import.meta.env.VITE_API_KEY) {
+        window.process.env.API_KEY = import.meta.env.VITE_API_KEY;
+      } else if (import.meta.env.API_KEY) {
+        window.process.env.API_KEY = import.meta.env.API_KEY;
+      }
+    }
+  } catch (e) {
+    console.debug("Could not automatically bridge import.meta.env");
+  }
+
+  // Global error handler to catch "Blank Page" issues
   window.addEventListener('error', function(event) {
     const errorMsg = event.message || "Unknown Error";
-    // Only show if the root is empty (app failed to mount)
     if (document.getElementById('root') && document.getElementById('root').innerHTML === '') {
-      const errorDiv = document.createElement('div');
-      errorDiv.style.padding = '20px';
-      errorDiv.style.backgroundColor = '#1e293b';
-      errorDiv.style.color = '#ef4444';
-      errorDiv.style.fontFamily = 'monospace';
-      errorDiv.innerHTML = '<h3>Application Error</h3><p>' + errorMsg + '</p>';
-      document.body.prepend(errorDiv);
+      console.error("Critical App Error:", errorMsg);
     }
   });
 </script>

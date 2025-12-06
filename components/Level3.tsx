@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { getSphinxRiddle } from '../services/geminiService';
 import { SphinxRiddle } from '../types';
@@ -29,17 +28,18 @@ const Level3: React.FC = () => {
     const [status, setStatus] = useState<RiddleStatus>('loading');
     const [userAnswer, setUserAnswer] = useState<number>(0);
     
-    const fetchRiddle = useCallback(async () => {
+    const fetchRiddle = useCallback(async (currentRiddle: SphinxRiddle | null) => {
         setStatus('loading');
         setRiddle(null);
         setUserAnswer(0);
-        const data = await getSphinxRiddle();
+        // Pass current riddle to get a new one
+        const data = await getSphinxRiddle(currentRiddle);
         setRiddle(data);
         setStatus('active');
     }, []);
 
     useEffect(() => {
-        fetchRiddle();
+        fetchRiddle(null);
     }, [fetchRiddle]);
 
     const handleSubmit = () => {
@@ -116,7 +116,7 @@ const Level3: React.FC = () => {
                                     <input 
                                         type="range" 
                                         min="0" 
-                                        max={riddle.requiredAmount * 2} // Give some headroom
+                                        max={Math.max(20, riddle.requiredAmount * 2)} 
                                         value={userAnswer}
                                         onChange={(e) => setUserAnswer(parseInt(e.target.value))}
                                         className="w-24 accent-cyan-500"
@@ -165,7 +165,7 @@ const Level3: React.FC = () => {
                                 <p className="text-green-200">{riddle.explanation}</p>
                             </div>
                             <button 
-                                onClick={fetchRiddle} 
+                                onClick={() => fetchRiddle(riddle)} 
                                 className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded-full text-lg transition duration-300 shadow-lg flex items-center gap-2 mx-auto"
                             >
                                 <RefreshIcon className="w-5 h-5" /> New Riddle

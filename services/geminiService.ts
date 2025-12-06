@@ -82,7 +82,6 @@ export const getNewRecipe = async (previousRecipe?: { green: number; purple: num
         const newRecipe = parseJson(response.text.trim());
 
         if (previousRecipe && newRecipe.green === previousRecipe.green && newRecipe.purple === previousRecipe.purple) {
-            console.warn("AI returned the same recipe. Using fallback logic.");
             return getFallback();
         }
 
@@ -110,7 +109,7 @@ export const getLevel1Hint = async (actualGreen: number, actualPurple: number, e
     }
 };
 
-export const getNewLevel2Challenge = async (): Promise<Level2Challenge | null> => {
+export const getNewLevel2Challenge = async (previousChallenge?: Level2Challenge | null): Promise<Level2Challenge | null> => {
     const fallback = {
         potionName: "Giant's Warming Potion",
         ingredient1Name: "Fire Salts",
@@ -128,16 +127,20 @@ export const getNewLevel2Challenge = async (): Promise<Level2Challenge | null> =
     if (!ai) return fallback;
 
     try {
-        const prompt = `You are a ratio logic engine for a potion game. Create a new challenge for scaling a recipe with "Fire Salts" and "Frost Dew".
+        let prompt = `You are a ratio logic engine. Create a scaling challenge with "Fire Salts" and "Frost Dew".
         Provide a JSON response with:
-        1. "potionName": A creative name for a large potion (e.g. "Giant's Growth Elixir").
-        2. "baseRatio1": A number between 1 and 5 for the "Fire Salts".
-        3. "baseRatio2": A number between 1 and 5 for the "Frost Dew". Ensure it's different from baseRatio1 and the ratio is simplified.
-        4. "scaleFactor": A whole number between 2 and 5.
-        5. "givenPart1": The value of baseRatio1 * scaleFactor.
-        6. "scaled_part_2": The correct answer, which is baseRatio2 * scaleFactor.
-        7. "total_units": The total drops in the new recipe (givenPart1 + scaled_part_2).
-        8. "hint": A simple hint, like "You're making the batch X times bigger, so you'll need X times as much Frost Dew!"`;
+        1. "potionName": Creative name.
+        2. "baseRatio1" (1-5), "baseRatio2" (1-5, distinct from ratio1).
+        3. "scaleFactor" (2-5).
+        4. "givenPart1" (baseRatio1 * scaleFactor).
+        5. "scaled_part_2" (baseRatio2 * scaleFactor).
+        6. "total_units" (givenPart1 + scaled_part_2).
+        7. "hint": A hint about multiplying the missing part by the scale factor.
+        `;
+
+        if (previousChallenge) {
+            prompt += ` The previous scale factor was ${previousChallenge.scaleFactor} and base ratio was ${previousChallenge.baseRatio1}:${previousChallenge.baseRatio2}. Generate different numbers.`;
+        }
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
@@ -163,18 +166,33 @@ export const getNewLevel2Challenge = async (): Promise<Level2Challenge | null> =
 
         const challengeData = parseJson(response.text.trim());
 
-        return {
+        // Safety check: Ensure the math is correct (AI sometimes hallucinates numbers)
+        const calculatedGiven = challengeData.baseRatio1 * challengeData.scaleFactor;
+        const calculatedAnswer = challengeData.baseRatio2 * challengeData.scaleFactor;
+        
+        // Overwrite potentially incorrect AI math with strict JS math
+        const correctedChallenge = {
             ...challengeData,
+            givenPart1: calculatedGiven,
+            scaled_part_2: calculatedAnswer,
+            total_units: calculatedGiven + calculatedAnswer,
             ingredient1Name: "Fire Salts",
             ingredient2Name: "Frost Dew",
         };
+
+        if (previousChallenge && correctedChallenge.baseRatio1 === previousChallenge.baseRatio1 && correctedChallenge.scaleFactor === previousChallenge.scaleFactor) {
+            return fallback; // Return fallback to force variety if AI repeats
+        }
+
+        return correctedChallenge;
+
     } catch (error) {
         console.error("Error fetching new level 2 challenge:", error);
         return fallback;
     }
 };
 
-export const getSphinxRiddle = async (): Promise<SphinxRiddle | null> => {
+export const getSphinxRiddle = async (previousRiddle?: SphinxRiddle | null): Promise<SphinxRiddle | null> => {
     const fallback = {
         riddleText: "For every 2 Red Gems, you need 3 Blue Gems. I have 4 Red Gems here. How many Blue Gems do I need to match?",
         ingredient1Name: "Red Gems",
@@ -190,28 +208,18 @@ export const getSphinxRiddle = async (): Promise<SphinxRiddle | null> => {
     if (!ai) return fallback;
 
     try {
-        const prompt = `Generate a very simple ratio word problem for a child (ages 7-10).
-        
+        let prompt = `Generate a very simple ratio word problem for a child (ages 7-10).
         Logic:
-        1. Pick two simple, fun items (e.g. "Red Apples", "Blue Berries", "Magic Stars", "Gold Coins", "Frogs"). Avoid complex fantasy jargon.
-        2. Establish a simple ratio between them (e.g., 2:3).
-        3. Determine a 'given amount' for the first ingredient that is a multiple of its ratio part (e.g., if ratio is 2:3, given might be 6).
-        4. Calculate the 'required amount' for the second ingredient.
-        5. Create a short, clear riddle text spoken by a friendly Sphinx asking for the required amount. Keep sentences short and simple.
-        
-        Example Riddle Text: "For every 2 Red Apples, I need 3 Blue Berries. I have 6 Red Apples. How many Blue Berries do I need?"
-        
-        Response JSON format:
-        {
-           "riddleText": "The text of the riddle...",
-           "ingredient1Name": "Name of first item",
-           "ingredient2Name": "Name of second item",
-           "ratio1": integer,
-           "ratio2": integer,
-           "givenAmount": integer,
-           "requiredAmount": integer,
-           "explanation": "A very simple explanation (e.g. 'Since you have 3 times the apples, you need 3 times the berries!')"
-        }`;
+        1. Pick two simple items (e.g. Apples/Berries, Stars/Moons).
+        2. Set a ratio (e.g. 2:3).
+        3. Set 'given amount' (multiple of first ratio part).
+        4. Calculate 'required amount'.
+        5. Create 'riddleText' asking for the required amount.
+        `;
+
+        if (previousRiddle) {
+            prompt += ` PREVIOUS RIDDLE ITEM: ${previousRiddle.ingredient1Name}. DO NOT USE ${previousRiddle.ingredient1Name} again. Pick completely different items.`;
+        }
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
@@ -235,7 +243,13 @@ export const getSphinxRiddle = async (): Promise<SphinxRiddle | null> => {
             },
         });
 
-        return parseJson(response.text.trim());
+        const data = parseJson(response.text.trim());
+        
+        if (previousRiddle && data.ingredient1Name === previousRiddle.ingredient1Name) {
+            return fallback;
+        }
+
+        return data;
     } catch (error) {
         console.error("Error fetching sphinx riddle:", error);
         return fallback;

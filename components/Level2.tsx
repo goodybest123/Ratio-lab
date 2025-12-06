@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { getNewLevel2Challenge } from '../services/geminiService';
 import { Level2Challenge } from '../types';
@@ -33,16 +32,17 @@ const Level2: React.FC = () => {
         setStatus('idle');
     }, []);
 
-    const fetchNewChallenge = useCallback(async () => {
+    const fetchNewChallenge = useCallback(async (currentChallenge: Level2Challenge | null) => {
         setIsFetchingChallenge(true);
         handleReset();
-        const newChallenge = await getNewLevel2Challenge();
+        // Pass current challenge to ensure we get a fresh one
+        const newChallenge = await getNewLevel2Challenge(currentChallenge);
         setChallenge(newChallenge);
         setIsFetchingChallenge(false);
     }, [handleReset]);
 
     useEffect(() => {
-        fetchNewChallenge();
+        fetchNewChallenge(null);
     }, [fetchNewChallenge]);
 
     const handleMix = () => {
@@ -62,16 +62,15 @@ const Level2: React.FC = () => {
 
     if (isFetchingChallenge && !challenge) {
         return (
-            <div className="bg-slate-800/50 p-8 rounded-2xl shadow-2xl backdrop-blur-lg border border-slate-700 text-center">
-                <h2 className="text-2xl sm:text-3xl font-bold text-cyan-300 animate-pulse">Brewing a Big Challenge...</h2>
+            <div className="bg-slate-800/50 p-8 rounded-2xl shadow-2xl backdrop-blur-lg border border-slate-700 text-center animate-pulse">
+                <h2 className="text-2xl sm:text-3xl font-bold text-cyan-300">Brewing a Big Challenge...</h2>
             </div>
         );
     }
     
     if (!challenge) {
-        return <div>Error loading challenge.</div>
+        return <div className="text-center p-8 text-red-400">Error loading challenge. Please refresh.</div>
     }
-
 
     return (
         <div className="bg-slate-800/50 p-4 sm:p-8 rounded-2xl shadow-2xl backdrop-blur-lg border border-slate-700 animate-fade-in">
@@ -94,7 +93,7 @@ const Level2: React.FC = () => {
                     </span>
                 </p>
                 <button 
-                  onClick={fetchNewChallenge} 
+                  onClick={() => fetchNewChallenge(challenge)} 
                   disabled={isFetchingChallenge}
                   className="absolute -top-4 -right-4 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold p-2 rounded-full transition duration-300 shadow-lg disabled:bg-slate-600 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-yellow-400"
                   aria-label="Get new challenge"
@@ -138,7 +137,7 @@ const Level2: React.FC = () => {
                     </div>
                     
                     {status === 'idle' && <button onClick={handleMix} disabled={isFetchingChallenge} className="w-full max-w-[200px] bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition duration-300 shadow-lg">{isFetchingChallenge ? 'Loading...' : 'Mix Giant Potion'}</button>}
-                    {status === 'success' && <button onClick={fetchNewChallenge} disabled={isFetchingChallenge} className="w-full max-w-[200px] bg-green-500 hover:bg-green-400 text-slate-900 font-bold py-3 px-4 rounded-lg text-lg transition duration-300 shadow-lg">{isFetchingChallenge ? 'Loading...' : 'Next Challenge'}</button>}
+                    {status === 'success' && <button onClick={() => fetchNewChallenge(challenge)} disabled={isFetchingChallenge} className="w-full max-w-[200px] bg-green-500 hover:bg-green-400 text-slate-900 font-bold py-3 px-4 rounded-lg text-lg transition duration-300 shadow-lg">{isFetchingChallenge ? 'Loading...' : 'Next Challenge'}</button>}
                     {status === 'failure' && <button onClick={handleReset} className="w-full max-w-[200px] bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-3 px-4 rounded-lg text-lg transition duration-300 shadow-lg">Try Again</button>}
 
                 </div>
